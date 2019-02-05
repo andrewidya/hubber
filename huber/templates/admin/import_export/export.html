@@ -1,0 +1,49 @@
+{% extends "admin/import_export/base.html" %}
+{% load i18n %}
+{% load admin_urls %}
+{% load import_export_tags %}
+
+{% block breadcrumbs_last %}
+<li>{% trans "Export" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="grp-content-container">
+  <div class="g-d-c">
+    <div class="g-d-12">
+      <form action="" method="POST">
+        {% csrf_token %}
+
+          <fieldset class="module grp-module">
+            {% for field in form.visible_fields %}
+              <div class="form-row grp-row l-2c-fluid l-d-4 grp-errors">
+                <div class="c-1">
+                  {{ field.label_tag }}
+                </div>
+                <div class="c-2">
+                  {{ field }}
+                  {% if field.field.help_text %}
+                    <p class="grp-help">{{ field.field.help_text|safe }}</p>
+                  {% endif %}
+                  {% if field.errors %}
+                  <ul class="errorlist">
+                    {% for error in field.errors %}
+                    <li>
+                      {{ error }}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </fieldset>
+
+          <div class="grp-module grp-submit-row">
+            <input type="submit" class="default" value="{% trans "Submit" %}">
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

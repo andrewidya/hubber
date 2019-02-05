@@ -1,0 +1,1 @@
+default_app_config = 'html2pdf.apps.Html2PdfConfig'

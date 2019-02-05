@@ -1,0 +1,6 @@
+{% load i18n %}
+{% load admin_urls %}
+
+{% if has_export_permission %}
+    <li><a href="" class="grp-state-focus">{% trans "Print" %}</a></li>
+{% endif %}

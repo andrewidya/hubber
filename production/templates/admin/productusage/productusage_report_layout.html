@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        table, th, td {
+            border: 1px solid;
+        }
+    </style>
+</head>
+<body>
+    <p>{{ total_data }}</p>
+    <table>
+        <tr>
+            <th>Tanggal</th>
+            <th>Material</th>
+            <th>Nama Produk</th>
+            <th>Penggunaan</th>
+            <th>Satuan</th>
+        </tr>
+        {% for manufacture in manufacture_list %}
+            <tr>
+                <td>{{ manufacture.datetime }}</td>
+                <td>{{ manufacture.item_name }}</td>
+                <td>{{ manufacture.product_name }}</td>
+                <td>{{ manufacture.usage }}</td>
+                <td>{{ manufacture.units }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
