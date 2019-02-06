@@ -21,12 +21,13 @@
         </tr>
         {% for manufacture in manufacture_list %}
             <tr>
-                <td>{{ manufacture.datetime }}</td>
-                <td>{{ manufacture.item_name }}</td>
-                <td>{{ manufacture.product_name }}</td>
-                <td>{{ manufacture.usage }}</td>
-                <td>{{ manufacture.units }}</td>
-            </tr>
+                <td rowspan="{{ manufacture.total_data }}">{{ manufacture.date }}</td>
+                {% for data in manufacture.data %}
+                <td>{{ data.item_name }}</td>
+                <td>{{ data.product_name }}</td>
+                <td>{{ data.usage }}</td>
+                <td>{{ data.unit }}</td></tr>
+                {% endfor %}
         {% endfor %}
     </table>
 </body>

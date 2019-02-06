@@ -7,6 +7,7 @@ from django.template import loader
 from django.db.models import F, Sum, Value, OuterRef, Subquery
 
 from import_export.admin import ImportExportMixin, ExportMixin
+from django_pivot.pivot import pivot
 
 from production.models.customer import Customer, CustomerCategory, Supplier
 from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, StockMovement
@@ -275,23 +276,23 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         cl = ChageList(**changelist_kwargs)
         return cl.get_queryset(request)
 
+    def get_productusage_by_rawmaterial(self, request):
+        """
+        Get data usage sorted by raw material.
 
-    def print(self, request):
-        template = loader.get_template('admin/productusage/productusage_report_layout.html')
+        """
         queryset = self.get_print_queryset(request)
-
+        queryset.order_by('manufacture__datetime')
         units = UnitMeasurement.objects.filter(pk=OuterRef('unit__pk'))
+
         material_usages = queryset.values(
-            datetime=F('manufacture__datetime'),
-            item_pk=F('item__pk'),
-            item_name=F('item__name'),
-            product_name=F('manufacture__bill_of_material__product__name')
+            datetime=F('manufacture__datetime__date'),
+            # item_pk=F('item__pk'),
+            item_name=F('item__name')
         ).annotate(
             usage=Sum('quantity'),
             units=Subquery(units.values('name')[:1])
-        ).order_by('datetime')
-
-        data_usage = []
+        ).order_by('manufacture__datetime__date')
 
         # sorting date range in selected/filtered queryset
         date_range = []
@@ -301,6 +302,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         date_range.sort()
 
         # sorting actual data from queryset to be printed
+        data_usage = []
         for current_date in date_range:
             container = {'date': current_date, 'data': [], 'total_data': 0}
             for recordset in material_usages:
@@ -308,16 +310,20 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
                     new_record = {}
                     new_record['item_pk'] = recordset['item_pk']
                     new_record['item_name'] = recordset['item_name']
-                    new_record['product_name'] = recordset['product_name']
                     new_record['usage'] = recordset['usage']
                     new_record['unit'] = recordset['units']
                     container['data'].append(new_record)
                     container['total_data'] += 1
             data_usage.append(container)
 
+        return data_usage
+
+    def print(self, request):
+        template = loader.get_template('admin/productusage/productusage_report_layout.html')
+        usage_per_rawmaterial = self.get_productusage_by_rawmaterial(request)
 
         context = {
-            'manufacture_list': data_usage,
+            'manufacture_list': usage_per_rawmaterial,
         }
 
         print("breakpoint")
