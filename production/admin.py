@@ -12,7 +12,7 @@ from django_pivot.pivot import pivot
 from production.models.customer import Customer, CustomerCategory, Supplier
 from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, StockMovement
 from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, Manufacture, ProductUsage
-from production.resources import ManufactureExportResource
+from production.resources import ManufactureExportResource, ProductUsageExportResource
 
 # Register your models here.
 @admin.register(Customer)
@@ -228,6 +228,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
     search_fields = ('item__code', 'item__name')
     list_filter = ('manufacture__datetime', 'manufacture__bill_of_material')
     change_list_template = 'admin/productusage/productusage_report_page.html'
+    resource_class = ProductUsageExportResource
 
     def get_datetime(self, obj):
         return obj.manufacture.datetime
@@ -274,6 +275,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
             'sortable_by': self.sortable_by
         }
         cl = ChageList(**changelist_kwargs)
+        print("breakpoint")
         return cl.get_queryset(request)
 
     def get_productusage_by_rawmaterial(self, request):
@@ -287,7 +289,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
 
         material_usages = queryset.values(
             datetime=F('manufacture__datetime__date'),
-            # item_pk=F('item__pk'),
+            item_pk=F('item__pk'),
             item_name=F('item__name')
         ).annotate(
             usage=Sum('quantity'),
