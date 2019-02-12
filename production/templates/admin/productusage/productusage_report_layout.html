@@ -1,34 +1,20 @@
-<!DOCTYPE html>
+{% load static %}
+
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
-    <style>
-        table, th, td {
-            border: 1px solid;
-        }
-    </style>
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" type="text/css" href="{% static 'production/table_report_style.css' %}">
+
+    <title>Document</title>
 </head>
 <body>
-    <p>{{ total_data }}</p>
-    <table>
-        <tr>
-            <th>Tanggal</th>
-            <th>Material</th>
-            <th>Nama Produk</th>
-            <th>Penggunaan</th>
-            <th>Satuan</th>
-        </tr>
-        {% for manufacture in manufacture_list %}
-            <tr>
-                <td rowspan="{{ manufacture.total_data }}">{{ manufacture.date }}</td>
-                {% for data in manufacture.data %}
-                <td>{{ data.item_name }}</td>
-                <td>{{ data.product_name }}</td>
-                <td>{{ data.usage }}</td>
-                <td>{{ data.unit }}</td></tr>
-                {% endfor %}
-        {% endfor %}
-    </table>
+    <h1>{{ page_title }}</h1>
+    {{ report|safe }}
+    <br />
+    {{ summary|safe }}
 </body>
 </html>

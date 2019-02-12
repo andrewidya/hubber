@@ -53,8 +53,8 @@ class Manufacture(models.Model):
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
 
     class Meta:
-        verbose_name = _("2.0. Produksi")
-        verbose_name_plural = _("2.0. Produksi")
+        verbose_name = _("1.9. Produksi")
+        verbose_name_plural = _("1.9. Produksi")
         app_label = 'production'
 
     def __str__(self):
@@ -72,8 +72,8 @@ class ProductUsage(models.Model):
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
 
     class Meta:
-        verbose_name = _("2.1. Penggunaan Barang")
-        verbose_name_plural = _("2.1. Daftar Penggunaan Barang")
+        verbose_name = _("2.0. Penggunaan Barang")
+        verbose_name_plural = _("2.0. Daftar Penggunaan Barang")
         app_label = 'production'
 
     def __str__(self):

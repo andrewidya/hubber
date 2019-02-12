@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'import_export',
     'debug_toolbar',
+    'html2pdf',
     'production',
 ]
 

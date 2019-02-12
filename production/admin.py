@@ -1,18 +1,20 @@
+import numpy as np
+import pandas as pd
 from decimal import  Decimal, getcontext
 
 from django.contrib import admin
 from django.conf.urls import url
-from django.http.response import HttpResponse
-from django.template import loader
-from django.db.models import F, Sum, Value, OuterRef, Subquery
+from django.template.response import TemplateResponse
+from django.db.models import F, Sum
 
 from import_export.admin import ImportExportMixin, ExportMixin
-from django_pivot.pivot import pivot
 
 from production.models.customer import Customer, CustomerCategory, Supplier
 from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, StockMovement
 from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, Manufacture, ProductUsage
 from production.resources import ManufactureExportResource, ProductUsageExportResource
+from production.forms import ProductUsageReportForm
+from html2pdf.response import HTML2PDFResponse
 
 # Register your models here.
 @admin.register(Customer)
@@ -72,11 +74,12 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     def total(self, obj):
         stock = obj.stock or Decimal(0.0000)
         usage = obj.usage or Decimal(0.0000)
+        deliver = obj.deliver or Decimal(0.0000)
         produce = Decimal(0.0000)
         if obj.produce:
             produce = Decimal(obj.produce)
         getcontext().prec = 9
-        total = stock - usage + produce
+        total = stock - usage + produce - deliver
         return total
 
 
@@ -275,58 +278,102 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
             'sortable_by': self.sortable_by
         }
         cl = ChageList(**changelist_kwargs)
-        print("breakpoint")
         return cl.get_queryset(request)
 
-    def get_productusage_by_rawmaterial(self, request):
-        """
-        Get data usage sorted by raw material.
+    def _get_dataframe(self, queryset):
+        data = dict(date=[], item_code=[], item_name=[], unit=[], product=[], quantity=[])
+        for i in queryset:
+            data['date'].append(i['datetime'].date())
+            data['item_code'].append(i['item_code'])
+            data['item_name'].append(i['item_name'])
+            data['unit'].append(i['item_unit_name'])
+            data['product'].append(i['product_name'])
+            data['quantity'].append(i['usage'])
 
-        """
-        queryset = self.get_print_queryset(request)
-        queryset.order_by('manufacture__datetime')
-        units = UnitMeasurement.objects.filter(pk=OuterRef('unit__pk'))
+        data_frame = pd.DataFrame(data=data)
+        return data_frame
 
-        material_usages = queryset.values(
-            datetime=F('manufacture__datetime__date'),
-            item_pk=F('item__pk'),
-            item_name=F('item__name')
-        ).annotate(
-            usage=Sum('quantity'),
-            units=Subquery(units.values('name')[:1])
-        ).order_by('manufacture__datetime__date')
+    def _pivoting_by_materialused(self, queryset):
+        data_frame = self._get_dataframe(queryset)
+        pivot = pd.pivot_table(
+            data_frame,
+            index=['date', 'item_code', 'item_name', 'unit', 'product'],
+            values='quantity',
+            aggfunc=np.sum,
+            fill_value=0
+        )
+        return pivot.to_html(classes=['minimalistBlack'])
 
-        # sorting date range in selected/filtered queryset
-        date_range = []
-        for i in material_usages:
-            if i['datetime'].date() not in date_range:
-                date_range.append(i['datetime'].date())
-        date_range.sort()
+    def _pivoting_materialused_sum(self, queryset):
+        data_frame = self._get_dataframe(queryset)
+        pivot = pd.pivot_table(
+            data_frame,
+            index=['date', 'item_code', 'item_name'],
+            values='quantity',
+            aggfunc=np.sum,
+            fill_value=0
+        )
+        return pivot.to_html(classes=['minimalistBlack'])
 
-        # sorting actual data from queryset to be printed
-        data_usage = []
-        for current_date in date_range:
-            container = {'date': current_date, 'data': [], 'total_data': 0}
-            for recordset in material_usages:
-                if recordset['datetime'].date() == current_date:
-                    new_record = {}
-                    new_record['item_pk'] = recordset['item_pk']
-                    new_record['item_name'] = recordset['item_name']
-                    new_record['usage'] = recordset['usage']
-                    new_record['unit'] = recordset['units']
-                    container['data'].append(new_record)
-                    container['total_data'] += 1
-            data_usage.append(container)
-
-        return data_usage
+    def _pivoting_product_output(self, queryset):
+        data_frame = self._get_dataframe(queryset)
+        pivot = pd.pivot_table(
+            data_frame,
+            index=['date', 'product', 'item_code', 'item_name', 'unit'],
+            values='quantity',
+            aggfunc=np.sum,
+            fill_value=0
+        )
+        return pivot.to_html(classes=['minimalistBlack'])
 
     def print(self, request):
-        template = loader.get_template('admin/productusage/productusage_report_layout.html')
-        usage_per_rawmaterial = self.get_productusage_by_rawmaterial(request)
+        form = ProductUsageReportForm(request.POST or None)
 
-        context = {
-            'manufacture_list': usage_per_rawmaterial,
-        }
+        if form.is_valid():
+            start_date = form.cleaned_data['start_date']
+            end_date = form.cleaned_data['end_date']
+            report_type = form.cleaned_data['report_type']
+            context = {}
+            template = 'admin/productusage/productusage_report_layout.html'
 
-        print("breakpoint")
-        return HttpResponse(template.render(context, request))
+            material = ProductUsage.objects.filter(
+                manufacture__datetime__date__range=[start_date, end_date]
+            ).select_related(
+                'manufacture', 'item', 'manufacture__bill_of_material__product'
+            ).values(
+                datetime=F('manufacture__datetime'),
+                item_pk=F('item__pk'),
+                item_code=F('item__code'),
+                item_name=F('item__name'),
+                item_unit_name=F('item__unit__name'),
+                product_name=F('manufacture__bill_of_material__product__name'),
+                usage=F('quantity'),
+                unit_name=F('unit__name')
+            ).order_by(
+                'manufacture__datetime__date', 'item'
+            )
+
+            if report_type == 'material':
+                data_mat = self._pivoting_by_materialused(material)
+                data_sum = self._pivoting_materialused_sum(material)
+                context['page_title'] = "Summary Penggunaan Material - Periode {} - {}".format(
+                    start_date, end_date
+                )
+                context['report'] = data_mat
+                context['summary'] = data_sum
+
+            if report_type == 'product':
+                data_sum = self._pivoting_product_output(material)
+                context['page_title'] = "Summary Penggunaan Material per Output Produksi - Periode {} - {}".format(
+                    start_date, end_date
+                )
+                context['report'] = data_sum
+
+            return HTML2PDFResponse(
+                request, template, context,
+                filename="{}-{}-{}".format(start_date, end_date, report_type)
+            )
+
+        opts = self.model._meta
+        context = dict(self.admin_site.each_context(request), opts=opts, form=form)
+        return TemplateResponse(request, 'admin/productusage/productusage_report.html', context=context)
