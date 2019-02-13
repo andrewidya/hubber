@@ -31,6 +31,8 @@ class InventoryItems(models.Model):
     name = models.CharField(verbose_name=_("Name"), max_length=45)
     type = models.CharField(verbose_name=_("Type"), max_length=3, choices=TYPE)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.CASCADE)
+    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14)
+    available = models.DecimalField(verbose_name=_("Available"), decimal_places=4, max_digits=14, default=0)
     objects = InventoryItemsManager()
 
     class Meta:

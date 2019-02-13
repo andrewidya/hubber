@@ -1,0 +1,72 @@
+{% load humanize static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manufacture Order Report</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'production/page_A6.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'production/table_report_style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'production/table_no_border.css' %}">
+</head>
+<body>
+<h3>Daftar Kebutuhan Material Produksi </h3>
+{% if manufacture %}
+    <table class="no-border">
+        <tr>
+            <td>Tanggal</td>
+            <td>:</td>
+            <td>{{ manufacture.datetime|date:'Y-m-d' }}</td>
+        </tr>
+        <tr>
+            <td>Jam</td>
+            <td>:</td>
+            <td>{{ manufacture.datetime|date:'H:i' }}</td>
+        </tr>
+        <tr>
+            <td>Customer</td>
+            <td>:</td>
+            <td>{{ manufacture.customer.name }}</td>
+        </tr>
+        <tr>
+            <td>Kode Formula</td>
+            <td>:</td>
+            <td>{{ manufacture.bill_of_material.code }}</td>
+        </tr>
+        <tr>
+            <td>Nama Produk</td>
+            <td>:</td>
+            <td>{{ manufacture.bill_of_material.product.name }}</td>
+        </tr>
+        <tr>
+            <td>Jumlah Produksi</td>
+            <td>:</td>
+            <td>{{ manufacture.quantity|floatformat:3|intcomma }} {{ manufacture.unit.name }}</td>
+        </tr>
+    </table>
+    <br />
+    {% if product_usage %}
+    <table class="minimalistBlack">
+        <thead>
+            <tr>
+                <th>Kode</th>
+                <th>Nama Material</th>
+                <th>Jumlah</th>
+                <th>Satuan</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in product_usage %}
+            <tr>
+                <th>{{ product.item.code }}</th>
+                <th>{{ product.item.name }}</th>
+                <th>{{ product.quantity|floatformat:3|intcomma }}</th>
+                <th>{{ product.unit.name }}</th>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+{% endif %}
+</body>
+</html>

@@ -45,12 +45,18 @@ class BillOfMaterialDetails(models.Model):
 
 
 class Manufacture(models.Model):
+    STATUS = (
+        ('on_going', 'Dalam proses'),
+        ('pending', 'Pending'),
+        ('done', 'Selesai'),
+    )
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     bill_of_material = models.ForeignKey(BillOfMaterial, verbose_name=_("BoM"), on_delete=models.PROTECT)
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14)
     customer = models.ForeignKey(Customer, verbose_name=_("Customer"), on_delete=models.PROTECT)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
+    status = models.CharField(verbose_name=_("Status"), max_length=8, choices=STATUS, default='pending')
 
     class Meta:
         verbose_name = _("1.9. Produksi")
