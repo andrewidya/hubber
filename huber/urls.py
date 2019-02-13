@@ -17,9 +17,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 
+from . import grappelli_urls
+
 urlpatterns = [
     path('grappelli/', include('grappelli.urls')), # grappelli URLS
     path('admin/', admin.site.urls),
+    path('doc/', include(grappelli_urls))
 ]
 
 if settings.DEBUG:

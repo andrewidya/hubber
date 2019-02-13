@@ -153,6 +153,7 @@
                 <form method="post">
                     {% csrf_token %}
                     <fieldset class="module grp-module">
+                        <h2>Print Report</h2>
                         {% for field in form.visible_fields %}
                             <div class="form-row grp-row l-2c-fluid l-d-4 grp-errors">
                                 <div class="c-1">

@@ -3,9 +3,10 @@ import pandas as pd
 from decimal import  Decimal, getcontext
 
 from django.contrib import admin
-from django.conf.urls import url
+from django.urls import path
 from django.template.response import TemplateResponse
-from django.db.models import F, Sum
+from django.http.response import HttpResponse
+from django.db.models import F
 
 from import_export.admin import ImportExportMixin, ExportMixin
 
@@ -68,19 +69,8 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'total', 'unit')
+    list_display = ('code', 'name', 'type', 'available', 'unit')
     list_per_page = 25
-
-    def total(self, obj):
-        stock = obj.stock or Decimal(0.0000)
-        usage = obj.usage or Decimal(0.0000)
-        deliver = obj.deliver or Decimal(0.0000)
-        produce = Decimal(0.0000)
-        if obj.produce:
-            produce = Decimal(obj.produce)
-        getcontext().prec = 9
-        total = stock - usage + produce - deliver
-        return total
 
 
 @admin.register(StockLevel)
@@ -196,8 +186,9 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
-                    'customer', 'quantity', 'unit')
+                    'customer', 'quantity', 'unit', 'status')
     search_fields = ('bill_of_material__code', 'bill_of_material__product__name')
+    list_editable = ('status',)
     list_filter = ('datetime',)
     inlines = [ProductUsageInline]
     raw_id_fields = ['bill_of_material', 'customer', 'unit']
@@ -206,6 +197,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
         'fk': ['bill_of_material', 'customer', 'unit']
     }
     resource_class = ManufactureExportResource
+    change_form_template = 'admin/manufacture/change_form.html'
 
     def save_model(self, request, obj, form, change):
         if obj.id == None:
@@ -222,6 +214,28 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
             ProductUsage.objects.bulk_create(material_usage)
         else:
             obj.save()
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        manufacture_urls = [
+            path('<int:object_id>/print/',
+                    self.admin_site.admin_view(self.print_bill_of_material),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+
+        return manufacture_urls + urls
+
+    def print_bill_of_material(self, request, object_id):
+        manufacture = Manufacture.objects.get(pk=object_id)
+        product_usage = ProductUsage.objects.filter(manufacture=manufacture)
+        context = {
+            'manufacture': manufacture,
+            'product_usage': product_usage,
+        }
+
+        return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',
+                                context=context, filename='BoM-{}'.format(manufacture.datetime))
 
 
 @admin.register(ProductUsage)
@@ -241,7 +255,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         urls = super().get_urls()
         info = self.get_model_info()
         productusage_urls = [
-            url(r'^print/$',
+            path('print/',
                 self.admin_site.admin_view(self.print),
                 name='{}_{}_print'.format(info[0], info[1]))
         ]
@@ -281,12 +295,14 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         return cl.get_queryset(request)
 
     def _get_dataframe(self, queryset):
-        data = dict(date=[], item_code=[], item_name=[], unit=[], product=[], quantity=[])
+        data = dict(date=[], item_code=[], item_name=[], unit=[], product=[],
+                    product_code=[], quantity=[])
         for i in queryset:
             data['date'].append(i['datetime'].date())
             data['item_code'].append(i['item_code'])
             data['item_name'].append(i['item_name'])
             data['unit'].append(i['item_unit_name'])
+            data['product_code'].append(i['product_code'])
             data['product'].append(i['product_name'])
             data['quantity'].append(i['usage'])
 
@@ -295,9 +311,10 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
 
     def _pivoting_by_materialused(self, queryset):
         data_frame = self._get_dataframe(queryset)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
         pivot = pd.pivot_table(
-            data_frame,
-            index=['date', 'item_code', 'item_name', 'unit', 'product'],
+            data_frame.round(3),
+            index=['date', 'item_code', 'item_name', 'unit', 'product_code', 'product'],
             values='quantity',
             aggfunc=np.sum,
             fill_value=0
@@ -306,8 +323,9 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
 
     def _pivoting_materialused_sum(self, queryset):
         data_frame = self._get_dataframe(queryset)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
         pivot = pd.pivot_table(
-            data_frame,
+            data_frame.round(3),
             index=['date', 'item_code', 'item_name'],
             values='quantity',
             aggfunc=np.sum,
@@ -317,9 +335,10 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
 
     def _pivoting_product_output(self, queryset):
         data_frame = self._get_dataframe(queryset)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
         pivot = pd.pivot_table(
-            data_frame,
-            index=['date', 'product', 'item_code', 'item_name', 'unit'],
+            data_frame.round(3),
+            index=['date', 'product_code', 'product', 'item_code', 'item_name', 'unit'],
             values='quantity',
             aggfunc=np.sum,
             fill_value=0
@@ -346,6 +365,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
                 item_code=F('item__code'),
                 item_name=F('item__name'),
                 item_unit_name=F('item__unit__name'),
+                product_code=F('manufacture__bill_of_material__product__code'),
                 product_name=F('manufacture__bill_of_material__product__name'),
                 usage=F('quantity'),
                 unit_name=F('unit__name')
