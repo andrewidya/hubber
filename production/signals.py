@@ -32,6 +32,8 @@ def delivery_update(sender, instance, created, **kwargs):
 @receiver(post_save, sender=ProductUsage)
 def productusage_update(sender, instance, created, **kwargs):
     item = InventoryItems.objects.get(pk=instance.item.pk)
+    manufacture = Manufacture.objects.get(pk=instance.manufacture.pk)
+    manufacture.save()
     get_total_stock_level(item)
 
 

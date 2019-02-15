@@ -12,7 +12,8 @@ class BillOfMaterial(models.Model):
                                           on_delete=models.CASCADE)
     color_name = models.CharField(verbose_name=_("Color name"), max_length=45)
     product = models.ForeignKey(InventoryItems, verbose_name=_("Product"), on_delete=models.CASCADE)
-    price = models.DecimalField(verbose_name=_("Price"), max_digits=14, decimal_places=4)
+    price = models.DecimalField(verbose_name=_("Price"), max_digits=14, decimal_places=4, null=True,
+                                blank=True, default=0)
     description = models.TextField(verbose_name=_("Description"), blank=True)
 
     class Meta:
@@ -33,7 +34,8 @@ class BillOfMaterialDetails(models.Model):
     material = models.ForeignKey(InventoryItems, verbose_name=_("Material"), on_delete=models.CASCADE)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.CASCADE)
-    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14)
+    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14,
+                                null=True, blank=True, default=0)
 
     class Meta:
         verbose_name = _("1.9. Rincian Formula")
@@ -52,7 +54,7 @@ class Manufacture(models.Model):
     )
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     bill_of_material = models.ForeignKey(BillOfMaterial, verbose_name=_("BoM"), on_delete=models.PROTECT)
-    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14)
+    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14, default=0)
     customer = models.ForeignKey(Customer, verbose_name=_("Customer"), on_delete=models.PROTECT)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
@@ -66,6 +68,15 @@ class Manufacture(models.Model):
     def __str__(self):
         return "{} - {}".format(self.bill_of_material.code, self.customer.name)
 
+    def save(self, *args, **kwargs):
+        product_usages = self.productusage_set.all()
+        total_price = 0
+        if product_usages.exists():
+            for i in product_usages:
+                total_price += i.price
+        self.price = total_price
+        super().save(*args, **kwargs)
+
     def _product_name(self):
         return self.bill_of_material.product.name
 
@@ -74,6 +85,7 @@ class ProductUsage(models.Model):
     item = models.ForeignKey(InventoryItems, verbose_name=_("Item"), on_delete=models.PROTECT)
     manufacture = models.ForeignKey(Manufacture, verbose_name=_("Manufacture process"),
                                     on_delete=models.CASCADE)
+    price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14, default=0)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
 
@@ -84,3 +96,8 @@ class ProductUsage(models.Model):
 
     def __str__(self):
         return "{} - {}".format(self.item.name, self.manufacture.bill_of_material.product.name)
+
+    def save(self, *args, **kwargs):
+        if not self.price:
+            self.price = self.quantity * self.item.price
+        super().save(*args, **kwargs)

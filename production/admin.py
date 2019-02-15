@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
-from decimal import  Decimal, getcontext
 
 from django.contrib import admin
 from django.urls import path
 from django.template.response import TemplateResponse
-from django.http.response import HttpResponse
 from django.db.models import F
 
 from import_export.admin import ImportExportMixin, ExportMixin
@@ -60,7 +58,7 @@ class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
 class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Inventory Information', {
-            'fields': (('code', 'type'), ('name', 'unit')),
+            'fields': (('code', 'type'), ('name', 'unit'), ('price',)),
         }),
     )
     raw_id_fields = ('unit',)
@@ -69,7 +67,7 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'available', 'unit')
+    list_display = ('code', 'name', 'type', 'available', 'unit', 'price')
     list_per_page = 25
 
 
@@ -126,6 +124,7 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
 class BillOfMaterialDetailsInline(admin.TabularInline):
     model = BillOfMaterialDetails
     extra = 0
+    fields = ('material', 'quantity', 'unit')
     raw_id_fields = ('material', 'unit')
     autocomplete_lookup_fields = {
         'fk': ['unit', 'material']
@@ -151,7 +150,7 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
             'fields': (('customer', 'customer_category'),),
         }),
         ('Product Details', {
-            'fields': (('code', 'color_name'), ('product', 'price')),
+            'fields': (('code', 'color_name'), ('product',)),
         }),
         ('', {
             'fields': ('description',),
@@ -182,7 +181,7 @@ class ProductUsageInline(admin.TabularInline):
 class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Production Details', {
-            'fields': (('datetime', 'customer'), ('price', 'bill_of_material'), ('quantity', 'unit')),
+            'fields': (('customer', 'datetime'), ('bill_of_material', 'price'), ('unit', 'quantity')),
         }),
     )
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
@@ -202,18 +201,18 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if obj.id == None:
             obj.save()
-            t_quantity = obj.quantity
-            bom_details = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
-            material_usage = []
+            t_qty = obj.quantity
+            bom = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
+            mtr_used = []
 
-            for i in bom_details:
-                p = ProductUsage(item=i.material, manufacture=obj,
-                                 quantity=(i.quantity * t_quantity), unit=i.unit)
-                material_usage.append(p)
+            for i in bom:
+                p = ProductUsage(item=i.material, manufacture=obj, quantity=(i.quantity * t_qty), unit=i.unit)
+                p.price = i.quantity * i.material.price
+                mtr_used.append(p)
 
-            ProductUsage.objects.bulk_create(material_usage)
-        else:
-            obj.save()
+            ProductUsage.objects.bulk_create(mtr_used)
+
+        super().save_model(request, obj, form, change)
 
     def get_urls(self):
         urls = super().get_urls()
