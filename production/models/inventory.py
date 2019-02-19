@@ -32,7 +32,10 @@ class InventoryItems(models.Model):
     type = models.CharField(verbose_name=_("Type"), max_length=3, choices=TYPE)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.CASCADE)
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=2, max_digits=14)
-    available = models.DecimalField(verbose_name=_("Available"), decimal_places=4, max_digits=14, default=0)
+    initial = models.DecimalField(verbose_name=_("Saldo Awal"), decimal_places=4, max_digits=14,
+                                  default=0)
+    available = models.DecimalField(verbose_name=_("Tersedia"), decimal_places=4, max_digits=14,
+                                    default=0)
     objects = InventoryItemsManager()
 
     class Meta:
@@ -54,7 +57,8 @@ class StockLevel(models.Model):
         ('return', "Return")
     )
     item = models.ForeignKey(InventoryItems, verbose_name=_("Item"), on_delete=models.CASCADE)
-    delivery_note = models.CharField(verbose_name=_("Delivery note"), max_length=45, null=True, blank=True)
+    delivery_note = models.CharField(verbose_name=_("Delivery note"), max_length=45, null=True,
+                                     blank=True)
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14)
@@ -80,7 +84,8 @@ class StockMovement(models.Model):
         ('sent', "Delivery"),
         ('return', "Return")
     )
-    delivery_order = models.CharField(verbose_name=_("Delivery order"), max_length=45, null=True, blank=True)
+    delivery_order = models.CharField(verbose_name=_("Delivery order"), max_length=45, null=True,
+                                      blank=True)
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     item = models.ForeignKey(InventoryItems, verbose_name=_("Item"), on_delete=models.CASCADE)
@@ -96,3 +101,19 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return "{} - {} - {}".format(self.delivery_order, self.customer.name, self.item.name)
+
+
+class InventoryAdjustment(models.Model):
+    item = models.ForeignKey(InventoryItems, verbose_name=_("Item"), on_delete=models.CASCADE)
+    quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14,
+                                   default=0)
+    last_edited = models.DateTimeField(verbose_name=_("Last edited"), auto_now=True)
+    first_created = models.DateTimeField(verbose_name=_("First edited"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("2.1. Penyesuaian / Pemutihan Stock")
+        verbose_name_plural = _("2.1. Penyesuaian / Pemutihan Stock")
+        app_label = 'production'
+
+    def __str__(self):
+        return self.item.name

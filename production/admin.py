@@ -5,14 +5,17 @@ from django.contrib import admin
 from django.urls import path
 from django.template.response import TemplateResponse
 from django.db.models import F
+from django.contrib import messages
 
 from import_export.admin import ImportExportMixin, ExportMixin
 
 from production.models.customer import Customer, CustomerCategory, Supplier
-from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, StockMovement
-from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, Manufacture, ProductUsage
+from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, \
+    StockMovement, InventoryAdjustment
+from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, \
+    Manufacture, ProductUsage
 from production.resources import ManufactureExportResource, ProductUsageExportResource
-from production.forms import ProductUsageReportForm
+from production.forms import ProductUsageReportForm, ProductUsageInlineForm
 from html2pdf.response import HTML2PDFResponse
 
 # Register your models here.
@@ -58,7 +61,7 @@ class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
 class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Inventory Information', {
-            'fields': (('code', 'type'), ('name', 'unit'), ('price',)),
+            'fields': (('code', 'type'), ('name', 'unit'), ('price', 'available'), 'initial'),
         }),
     )
     raw_id_fields = ('unit',)
@@ -67,8 +70,18 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'available', 'unit', 'price')
+    list_display = ('code', 'name', 'type', 'initial', 'available', 'unit', 'price')
     list_per_page = 25
+
+
+@admin.register(InventoryAdjustment)
+class InventoryAdjustmentAdmin(admin.ModelAdmin):
+    fields = (('item', 'quantity'), )
+    list_display = ('item', 'quantity', 'last_edited', 'first_created')
+    raw_id_fields = ['item',]
+    autocomplete_lookup_fields = {
+        'fk': ['item',]
+    }
 
 
 @admin.register(StockLevel)
@@ -175,6 +188,7 @@ class ProductUsageInline(admin.TabularInline):
     autocomplete_lookup_fields = {
         'fk': ['item', 'unit']
     }
+    form = ProductUsageInlineForm
 
 
 @admin.register(Manufacture)
@@ -187,6 +201,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
                     'customer', 'quantity', 'unit', 'status')
     search_fields = ('bill_of_material__code', 'bill_of_material__product__name')
+    readonly_fields = ('price',)
     list_editable = ('status',)
     list_filter = ('datetime',)
     inlines = [ProductUsageInline]
@@ -205,14 +220,33 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
             bom = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
             mtr_used = []
 
+            msgs = []
             for i in bom:
                 p = ProductUsage(item=i.material, manufacture=obj, quantity=(i.quantity * t_qty), unit=i.unit)
-                p.price = i.quantity * i.material.price
-                mtr_used.append(p)
+                if p.quantity > p.item.available:
+                    msgs.append("Stock \"{} - {}\" tidak mencukupi".format(p.item.code, p.item.name))
+                else:
+                    p.price = i.quantity * i.material.price
+                    mtr_used.append(p)
+
+            if msgs:
+                for i in msgs:
+                    messages.add_message(request, messages.ERROR, i)
+                info_msg = "Hapus record produksi \"{} - {} untuk {} tanggal {}\" agar " \
+                           "tidak mempengaruhi nilai stock".format(obj.bill_of_material.product.code,
+                                                                   obj.bill_of_material.product.name,
+                                                                   obj.customer.name,
+                                                                   obj.datetime)
+                messages.add_message(request, messages.INFO, info_msg)
 
             ProductUsage.objects.bulk_create(mtr_used)
 
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        obj.save()
 
     def get_urls(self):
         urls = super().get_urls()

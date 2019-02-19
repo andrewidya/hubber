@@ -53,7 +53,7 @@ class Manufacture(models.Model):
         ('done', 'Selesai'),
     )
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
-    bill_of_material = models.ForeignKey(BillOfMaterial, verbose_name=_("BoM"), on_delete=models.PROTECT)
+    bill_of_material = models.ForeignKey(BillOfMaterial, verbose_name=_("BoM"),on_delete=models.PROTECT)
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14, default=0)
     customer = models.ForeignKey(Customer, verbose_name=_("Customer"), on_delete=models.PROTECT)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
@@ -74,11 +74,13 @@ class Manufacture(models.Model):
         if product_usages.exists():
             for i in product_usages:
                 total_price += i.price
+                i.save()
         self.price = total_price
         super().save(*args, **kwargs)
 
     def _product_name(self):
         return self.bill_of_material.product.name
+    _product_name.short_description = _("Product name")
 
 
 class ProductUsage(models.Model):

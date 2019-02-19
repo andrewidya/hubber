@@ -11,6 +11,8 @@ class InventoryItemsManager(models.Manager):
         )
         manufacture_quantity = models.Sum('billofmaterial__manufacture__quantity', distinct=True)
         deliver_quantity = models.Sum('stockmovement__quantity', distinct=True)
+        adjustment = models.Sum('inventoryadjustment__quantity', distinct=True)
 
         return super().get_queryset().annotate(stock=stocklevel_quantity, usage=productusage_quantity,
-                                               produce=manufacture_quantity, deliver=deliver_quantity)
+                                               produce=manufacture_quantity, deliver=deliver_quantity,
+                                               adjustment=adjustment)
