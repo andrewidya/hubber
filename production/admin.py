@@ -15,7 +15,7 @@ from production.models.inventory import UnitMeasurement, InventoryItems, StockLe
 from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, \
     Manufacture, ProductUsage
 from production.resources import ManufactureExportResource, ProductUsageExportResource
-from production.forms import ProductUsageReportForm, ProductUsageInlineForm
+from production.forms import ProductUsageReportForm, ProductUsageInlineForm, StockMovementForm
 from html2pdf.response import HTML2PDFResponse
 
 # Register your models here.
@@ -70,8 +70,8 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'initial','purchased','produced', 'used', 'delivered', 'availability' ,'unit', 'price')
-    list_per_page = 25
+    list_display = ('code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
+    list_per_page = 15
 
 
 @admin.register(InventoryAdjustment)
@@ -132,6 +132,7 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     list_filter = ('status', 'datetime')
     list_display = ('item', 'customer', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
+    form = StockMovementForm
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'return':
@@ -228,7 +229,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
             msgs = []
             for i in bom:
                 p = ProductUsage(item=i.material, manufacture=obj, quantity=(i.quantity * t_qty), unit=i.unit)
-                if p.quantity > p.item.available:
+                if p.quantity > p.item.availability():
                     msgs.append("Stock \"{} - {}\" tidak mencukupi".format(p.item.code, p.item.name))
                 else:
                     p.price = i.quantity * i.material.price

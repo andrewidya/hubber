@@ -36,8 +36,6 @@ class InventoryItems(models.Model):
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=2, max_digits=14)
     initial = models.DecimalField(verbose_name=_("Saldo Awal"), decimal_places=4, max_digits=14,
                                   default=0)
-    available = models.DecimalField(verbose_name=_("Tersedia"), decimal_places=4, max_digits=14,
-                                    default=0)
     objects = InventoryItemsManager()
 
     class Meta:
@@ -72,10 +70,15 @@ class InventoryItems(models.Model):
         val = agg_delivered.get('total') or Decimal(0.0000)
         return round(val, 4)
 
+    def adjustment(self):
+        agg_adjust = self.inventoryadjustment_set.all().aggregate(total=models.Sum('quantity'))
+        val = agg_adjust.get('total') or Decimal(0.0000)
+        return round(val, 4)
+
     def availability(self):
-        avl = self.initial + self.purchased() + self.produced() - self.used() - self.delivered()
+        avl = self.initial + self.purchased() + self.produced() - self.used() - self.delivered() + self.adjustment()
         return round(avl, 4)
-    
+
 
 class StockLevel(models.Model):
     STATUS = (

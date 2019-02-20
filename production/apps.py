@@ -6,4 +6,5 @@ class ProductionConfig(AppConfig):
     verbose_name = 'Huber System'
 
     def ready(self):
-       import production.signals
+        pass
+        # import production.signals TODO evalute
