@@ -70,7 +70,7 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'initial', 'available', 'unit', 'price')
+    list_display = ('code', 'name', 'type', 'initial','purchased','produced', 'used', 'delivered', 'availability' ,'unit', 'price')
     list_per_page = 25
 
 
@@ -107,7 +107,7 @@ class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'return':
-            obj.quantity = obj.quantity * -1
+            obj.quantity *= -1
         super().save_model(request, obj, form, change)
 
 
@@ -132,6 +132,11 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     list_filter = ('status', 'datetime')
     list_display = ('item', 'customer', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
+
+    def save_model(self, request, obj, form, change):
+        if obj.status == 'return':
+            obj.quantity *= -1
+        super().save_model(request, obj, form, change)
 
 
 class BillOfMaterialDetailsInline(admin.TabularInline):

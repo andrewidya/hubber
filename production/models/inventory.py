@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.utils.translation import  ugettext_lazy as _
 from django.db import models
 
@@ -50,6 +52,30 @@ class InventoryItems(models.Model):
     def autocomplete_search_fields():
         return ('id__iexact', 'code__icontains',)
 
+    def purchased(self):
+        agg_purchased = self.stocklevel_set.all().aggregate(total=models.Sum('quantity'))
+        val = agg_purchased.get('total') or Decimal(0.0000)
+        return round(val, 4)
+
+    def produced(self):
+        agg_produced = self.billofmaterial_set.all().aggregate(total=models.Sum('manufacture__quantity'))
+        val = agg_produced.get('total') or Decimal(0.0000)
+        return round(val, 4)
+
+    def used(self):
+        agg_used = self.productusage_set.all().aggregate(total=models.Sum('quantity'))
+        val = agg_used.get('total') or Decimal(0.0000)
+        return round(val, 4)
+
+    def delivered(self):
+        agg_delivered = self.stockmovement_set.all().aggregate(total=models.Sum('quantity'))
+        val = agg_delivered.get('total') or Decimal(0.0000)
+        return round(val, 4)
+
+    def availability(self):
+        avl = self.initial + self.purchased() + self.produced() - self.used() - self.delivered()
+        return round(avl, 4)
+    
 
 class StockLevel(models.Model):
     STATUS = (

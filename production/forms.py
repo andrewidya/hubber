@@ -38,7 +38,7 @@ class ProductUsageInlineForm(forms.ModelForm):
         qty = cleaned_data['quantity']
         item = cleaned_data['item']
 
-        if qty > item.available:
+        if qty > item.availability():
             raise forms.ValidationError(
                 _("Jumlah stock yang tersedia tidak mencukupi")
             )
