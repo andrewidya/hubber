@@ -16,10 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.http import HttpResponseRedirect
 
 from . import grappelli_urls
 
+
 urlpatterns = [
+    path('', lambda x: HttpResponseRedirect('admin')),
     path('grappelli/', include('grappelli.urls')), # grappelli URLS
     path('admin/', admin.site.urls),
     path('doc/', include(grappelli_urls))

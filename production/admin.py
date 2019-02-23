@@ -49,6 +49,7 @@ class SupplierAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
+    list_display = ('name',)
     list_per_page = 25
 
 
@@ -61,7 +62,7 @@ class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
 class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Inventory Information', {
-            'fields': (('code', 'type'), ('name', 'unit'), ('price', 'available'), 'initial'),
+            'fields': (('code', 'type'), ('name', 'unit'), ('price', 'initial')),
         }),
     )
     raw_id_fields = ('unit',)
@@ -115,7 +116,7 @@ class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
 class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Stock Movement Details', {
-            'fields': ('customer', ('delivery_order', 'datetime'), 'status')
+            'fields': (('customer', 'jo_number'), ('delivery_order', 'datetime'), 'status')
         }),
         ('Item Details', {
             'fields': ('item', ('quantity', 'unit'))

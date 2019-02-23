@@ -56,7 +56,7 @@ class InventoryItems(models.Model):
         return round(val, 4)
 
     def produced(self):
-        agg_produced = self.billofmaterial_set.all().aggregate(total=models.Sum('manufacture__quantity'))
+        agg_produced = self.billofmaterial_set.filter(manufacture__status='done').aggregate(total=models.Sum('manufacture__quantity'))
         val = agg_produced.get('total') or Decimal(0.0000)
         return round(val, 4)
 
@@ -121,6 +121,7 @@ class StockMovement(models.Model):
     customer = models.ForeignKey(Customer, verbose_name=_("Customer"), on_delete=models.CASCADE)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.CASCADE)
     status = models.CharField(verbose_name=_("Status"), max_length=6, choices=STATUS)
+    jo_number = models.CharField(verbose_name=_("JO number"), max_length=50, null=True, blank=True)
     description = models.TextField(verbose_name=_("Description"), blank=True)
 
     class Meta:
