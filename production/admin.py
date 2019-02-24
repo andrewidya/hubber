@@ -6,6 +6,7 @@ from django.urls import path
 from django.template.response import TemplateResponse
 from django.db.models import F, Q
 from django.contrib import messages
+from django.utils import timezone
 
 from import_export.admin import ImportExportMixin, ExportMixin
 
@@ -73,6 +74,64 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     list_filter = ('type', 'unit')
     list_display = ('code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
     list_per_page = 15
+    change_list_template = 'admin/inventory/inventory_item_report_page.html'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        inventory_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_itenvetoryitem),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+
+        return inventory_urls + urls
+
+    def get_print_queryset(self, request):
+        """
+        Return print queryset.
+
+        Default implementation respects applied search and filters.
+        """
+        list_display = self.get_list_display(request)
+        list_display_links = self.get_list_display_links(request, list_display)
+        list_filter = self.get_list_filter(request)
+        search_fields = self.get_search_fields(request)
+        if self.get_actions(request):
+            list_display = ['action_checkbox'] + list(list_display)
+
+        Changelist = self.get_changelist(request)
+        changelist_kwargs = {
+            'request': request,
+            'model': self.model,
+            'list_display': list_display,
+            'list_display_links': list_display_links,
+            'list_filter': list_filter,
+            'date_hierarchy': self.date_hierarchy,
+            'search_fields': search_fields,
+            'list_select_related': self.list_select_related,
+            'list_per_page': self.list_per_page,
+            'list_max_show_all': self.list_max_show_all,
+            'list_editable': self.list_editable,
+            'model_admin': self,
+            'sortable_by': self.sortable_by
+        }
+        cl = Changelist(**changelist_kwargs)
+        return cl.get_queryset(request)
+
+    def print_itenvetoryitem(self, request):
+        object = self.get_print_queryset(request)
+        template = 'admin/inventory/inventory_item_stock_card.html'
+        date = timezone.now()
+        context = {
+            'item_list': object,
+            'page_title': "Daftar Persediaan Inventory",
+            'date': date
+        }
+        return HTML2PDFResponse(
+            request, template, context,
+            filename="Inventory Stock Card - {}".format(date)
+        )
 
 
 @admin.register(InventoryAdjustment)
