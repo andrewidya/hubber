@@ -4,7 +4,7 @@ import pandas as pd
 from django.contrib import admin
 from django.urls import path
 from django.template.response import TemplateResponse
-from django.db.models import F
+from django.db.models import F, Q
 from django.contrib import messages
 
 from import_export.admin import ImportExportMixin, ExportMixin
@@ -131,7 +131,7 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('item__name', 'customer__name', 'delivery_order')
     list_filter = ('status', 'datetime')
-    list_display = ('item', 'customer', 'quantity', 'unit', 'datetime', 'status')
+    list_display = ('item', 'customer', 'jo_number', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
     form = StockMovementForm
 
@@ -225,11 +225,15 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
             obj.save()
             t_qty = obj.quantity
             bom = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
+            bom_output_weight = obj.bill_of_material.output_weight()
             mtr_used = []
 
             msgs = []
             for i in bom:
-                p = ProductUsage(item=i.material, manufacture=obj, quantity=(i.quantity * t_qty), unit=i.unit)
+                p = ProductUsage(
+                    item=i.material, manufacture=obj,
+                    quantity=((i.quantity / bom_output_weight) * t_qty), unit=i.unit
+                )
                 if p.quantity > p.item.availability():
                     msgs.append("Stock \"{} - {}\" tidak mencukupi".format(p.item.code, p.item.name))
                 else:
@@ -268,10 +272,13 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def print_bill_of_material(self, request, object_id):
         manufacture = Manufacture.objects.get(pk=object_id)
-        product_usage = ProductUsage.objects.filter(manufacture=manufacture)
+        filters = (Q(item__type='TTD') | Q(item__type='BT'))
+        product_usage = ProductUsage.objects.filter(manufacture=manufacture).exclude(item__type='CON')
+        consumable = ProductUsage.objects.filter(manufacture=manufacture).exclude(filters)
         context = {
             'manufacture': manufacture,
             'product_usage': product_usage,
+            'consumable': consumable,
         }
 
         return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',
@@ -385,6 +392,29 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         )
         return pivot.to_html(classes=['minimalistBlack'])
 
+    def _pivoting_product_output_summary(self, queryset):
+        data = dict(date=[], product_code=[], product_name=[], unit=[], quantity=[], price=[])
+
+        for i in queryset:
+            data['date'].append(i['date_time'].date())
+            data['product_code'].append(i['product_code'])
+            data['product_name'].append(i['product_name'])
+            data['unit'].append(i['unit_name'])
+            data['quantity'].append(i['qty'])
+            data['price'].append(i['total'])
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        data_frame['price'] = data_frame['price'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'unit'],
+            values='quantity',
+            aggfunc=np.sum,
+            fill_value=0
+        )
+        return pivot.to_html(classes=['minimalistBlack'])
+
     def print(self, request):
         form = ProductUsageReportForm(request.POST or None)
 
@@ -423,11 +453,27 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
                 context['summary'] = data_sum
 
             if report_type == 'product':
-                data_sum = self._pivoting_product_output(material)
+                manufacture = Manufacture.objects.filter(
+                    datetime__date__range=[start_date, end_date]
+                ).values(
+                    date_time=F('datetime'),
+                    bom=F('bill_of_material'),
+                    product_code=F('bill_of_material__product__code'),
+                    product_name=F('bill_of_material__product__name'),
+                    unit_name=F('unit__name'),
+                    qty=F('quantity'),
+                    total=F('price'),
+                ).order_by(
+                    'datetime__date', 'bill_of_material__product__name'
+                )
+
+                data_mat = self._pivoting_product_output(material)
+                data_sum = self._pivoting_product_output_summary(manufacture)
                 context['page_title'] = "Summary Penggunaan Material per Output Produksi - Periode {} - {}".format(
                     start_date, end_date
                 )
-                context['report'] = data_sum
+                context['report'] = data_mat
+                context['summary'] = data_sum
 
             return HTML2PDFResponse(
                 request, template, context,

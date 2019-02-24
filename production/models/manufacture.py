@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.utils.translation import  ugettext_lazy as _
 from django.db import models
 
@@ -27,6 +29,11 @@ class BillOfMaterial(models.Model):
     @staticmethod
     def autocomplete_search_fields():
         return ('id__iexact', 'code__icontains')
+
+    def output_weight(self):
+        agg_val = self.billofmaterialdetails_set.all().aggregate(total=models.Sum('quantity'))
+        val = agg_val.get('total') or Decimal(0.0000)
+        return round(val, 4)
 
 
 class BillOfMaterialDetails(models.Model):

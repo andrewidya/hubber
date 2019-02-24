@@ -60,4 +60,6 @@ class StockMovementForm(forms.ModelForm):
             raise forms.ValidationError(
                 _("Jumlah stock yang tersedia tidak mencukupi")
             )
+        else:
+            return qty
 
