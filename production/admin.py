@@ -20,6 +20,40 @@ from production.forms import ProductUsageReportForm, ProductUsageInlineForm, Sto
 from html2pdf.response import HTML2PDFResponse
 
 # Register your models here.
+class BasePrintAdmin(object):
+    def get_print_queryset(self, request):
+        """
+        Return print queryset.
+
+        Default implementation respects applied search and filters.
+        """
+        list_display = self.get_list_display(request)
+        list_display_links = self.get_list_display_links(request, list_display)
+        list_filter = self.get_list_filter(request)
+        search_fields = self.get_search_fields(request)
+        if self.get_actions(request):
+            list_display = ['action_checkbox'] + list(list_display)
+
+        Changelist = self.get_changelist(request)
+        changelist_kwargs = {
+            'request': request,
+            'model': self.model,
+            'list_display': list_display,
+            'list_display_links': list_display_links,
+            'list_filter': list_filter,
+            'date_hierarchy': self.date_hierarchy,
+            'search_fields': search_fields,
+            'list_select_related': self.list_select_related,
+            'list_per_page': self.list_per_page,
+            'list_max_show_all': self.list_max_show_all,
+            'list_editable': self.list_editable,
+            'model_admin': self,
+            'sortable_by': self.sortable_by
+        }
+        cl = Changelist(**changelist_kwargs)
+        return cl.get_queryset(request)
+
+
 @admin.register(Customer)
 class CustomerAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
@@ -60,7 +94,7 @@ class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
 
 
 @admin.register(InventoryItems)
-class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
+class InventoryItemAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Inventory Information', {
             'fields': (('code', 'type'), ('name', 'unit'), ('price', 'initial')),
@@ -87,41 +121,9 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
 
         return inventory_urls + urls
 
-    def get_print_queryset(self, request):
-        """
-        Return print queryset.
-
-        Default implementation respects applied search and filters.
-        """
-        list_display = self.get_list_display(request)
-        list_display_links = self.get_list_display_links(request, list_display)
-        list_filter = self.get_list_filter(request)
-        search_fields = self.get_search_fields(request)
-        if self.get_actions(request):
-            list_display = ['action_checkbox'] + list(list_display)
-
-        Changelist = self.get_changelist(request)
-        changelist_kwargs = {
-            'request': request,
-            'model': self.model,
-            'list_display': list_display,
-            'list_display_links': list_display_links,
-            'list_filter': list_filter,
-            'date_hierarchy': self.date_hierarchy,
-            'search_fields': search_fields,
-            'list_select_related': self.list_select_related,
-            'list_per_page': self.list_per_page,
-            'list_max_show_all': self.list_max_show_all,
-            'list_editable': self.list_editable,
-            'model_admin': self,
-            'sortable_by': self.sortable_by
-        }
-        cl = Changelist(**changelist_kwargs)
-        return cl.get_queryset(request)
-
     def print_itenvetoryitem(self, request):
         object = self.get_print_queryset(request)
-        template = 'admin/inventory/inventory_item_stock_card.html'
+        template = 'admin/inventory/inventory_item_pdf_layout.html'
         date = timezone.now()
         context = {
             'item_list': object,
@@ -145,7 +147,7 @@ class InventoryAdjustmentAdmin(admin.ModelAdmin):
 
 
 @admin.register(StockLevel)
-class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
+class StockLevelAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Stock Movement Details', {
             'fields': (('item', 'supplier'),('delivery_note', 'datetime'))
@@ -170,9 +172,51 @@ class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
             obj.quantity *= -1
         super().save_model(request, obj, form, change)
 
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        purchasing_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_purchasing),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+        return purchasing_urls + urls
+
+    def print_purchasing(self, request):
+        queryset = self.get_print_queryset(request)
+        page_title = "Daftar Pembelian Baranag"
+        date = timezone.now()
+        data = dict(date=[], product_code=[], product_name=[], status=[], quantity=[])
+        for i in queryset:
+            data['date'].append(i.datetime.date())
+            data['product_code'].append(i.item.code)
+            data['product_name'].append(i.item.name)
+            data['status'].append(i.status)
+            data['quantity'].append(i.quantity)
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'status'],
+            values='quantity',
+            fill_value=0
+        )
+        template = 'admin/stocklevel/stocklevel_print_pdf_layout.html'
+        context = {
+            'delivery_list': pivot.to_html(classes=['minimalistBlack']),
+            'page_title': page_title,
+            'date': date
+        }
+
+        return HTML2PDFResponse(
+            request, template, context=context,
+            filename="Purchasing - {}".format(date)
+        )
+
 
 @admin.register(StockMovement)
-class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
+class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Stock Movement Details', {
             'fields': (('customer', 'jo_number'), ('delivery_order', 'datetime'), 'status')
@@ -193,11 +237,54 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ('item', 'customer', 'jo_number', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
     form = StockMovementForm
+    change_list_template = 'admin/stockmovement/stockmovement_report_page.html'
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'return':
             obj.quantity *= -1
         super().save_model(request, obj, form, change)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        delivery_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_delivery),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+        return delivery_urls + urls
+
+    def print_delivery(self, request):
+        queryset = self.get_print_queryset(request)
+        page_title = "Daftar Pengiriman Baranag"
+        date = timezone.now()
+        data = dict(date=[], product_code=[], product_name=[], status=[], quantity=[])
+        for i in queryset:
+            data['date'].append(i.datetime.date())
+            data['product_code'].append(i.item.code)
+            data['product_name'].append(i.item.name)
+            data['status'].append(i.status)
+            data['quantity'].append(i.quantity)
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'status'],
+            values='quantity',
+            fill_value=0
+        )
+        template = 'admin/stockmovement/stockmovement_pdf_layout.html'
+        context = {
+            'delivery_list': pivot.to_html(classes=['minimalistBlack']),
+            'page_title': page_title,
+            'date': date
+        }
+
+        return HTML2PDFResponse(
+            request, template, context=context,
+            filename="Delivery - {}".format(date)
+        )
 
 
 class BillOfMaterialDetailsInline(admin.TabularInline):
@@ -263,11 +350,14 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
         ('Production Details', {
             'fields': (('customer', 'datetime'), ('bill_of_material', 'price'), ('unit', 'quantity')),
         }),
+        ('', {
+            'fields': ('bom_output_standard',),
+        })
     )
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
                     'customer', 'quantity', 'unit', 'status')
     search_fields = ('bill_of_material__code', 'bill_of_material__product__name')
-    readonly_fields = ('price',)
+    readonly_fields = ('price', 'bom_output_standard')
     list_editable = ('status',)
     list_filter = ('datetime',)
     inlines = [ProductUsageInline]

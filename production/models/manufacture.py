@@ -62,6 +62,10 @@ class Manufacture(models.Model):
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     bill_of_material = models.ForeignKey(BillOfMaterial, verbose_name=_("BoM"),on_delete=models.PROTECT)
     price = models.DecimalField(verbose_name=_("Price"), decimal_places=4, max_digits=14, default=0)
+    bom_output_standard = models.DecimalField(
+        verbose_name=_("Standard output formula"), decimal_places=4, max_digits=14, default=0,
+        help_text=_("Jumlah output yang dikeluarkan oleh formula produksi, sesuai satuan dalam stock")
+    )
     customer = models.ForeignKey(Customer, verbose_name=_("Customer"), on_delete=models.PROTECT)
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     unit = models.ForeignKey(UnitMeasurement, verbose_name=_("Unit"), on_delete=models.PROTECT)
@@ -83,6 +87,7 @@ class Manufacture(models.Model):
                 total_price += i.price
                 i.save()
         self.price = total_price
+        self.bom_output_standard = self.bill_of_material.output_weight()
         super().save(*args, **kwargs)
 
     def _product_name(self):

@@ -19,6 +19,7 @@
     <table class="minimalistBlack">
         <thead>
             <tr>
+                <th>No</th>
                 <th>Code</th>
                 <th>Nama</th>
                 <th>Jenis</th>
@@ -29,6 +30,7 @@
         <tbody>
             {% for item in item_list %}
             <tr>
+                <td>{{ forloop.counter }}</td>
                 <td>{{ item.code }}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.type }}</td>
