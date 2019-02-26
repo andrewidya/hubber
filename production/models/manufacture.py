@@ -17,6 +17,11 @@ class BillOfMaterial(models.Model):
     price = models.DecimalField(verbose_name=_("Price"), max_digits=14, decimal_places=4, null=True,
                                 blank=True, default=0)
     description = models.TextField(verbose_name=_("Description"), blank=True)
+    output_standard = models.DecimalField(
+        verbose_name=_("Standard output formula"), decimal_places=4, max_digits=14, default=0,
+        help_text=_(
+            "Jumlah output yang dikeluarkan oleh formula produksi, sesuai satuan dalam stock")
+    )
 
     class Meta:
         verbose_name = _("1.8. Formula")
@@ -25,6 +30,11 @@ class BillOfMaterial(models.Model):
 
     def __str__(self):
         return "{} - {}".format(self.code, self.product.name)
+
+    def save(self, *args, **kwargs):
+        super().save(args, kwargs)
+        self.output_standard = self.output_weight()
+        super().save(args, kwargs)
 
     @staticmethod
     def autocomplete_search_fields():

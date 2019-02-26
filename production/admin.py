@@ -62,7 +62,7 @@ class CustomerAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
-    list_display = ('name',)
+    list_display = ('id', 'name',)
     list_per_page = 25
 
 
@@ -74,6 +74,7 @@ class CustomerCategoryAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
+    list_display = ('id', 'name')
 
 
 @admin.register(Supplier)
@@ -84,13 +85,14 @@ class SupplierAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
-    list_display = ('name',)
+    list_display = ('id', 'name',)
     list_per_page = 25
 
 
 @admin.register(UnitMeasurement)
 class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ('name',)
+    list_display = ('id', 'name',)
 
 
 @admin.register(InventoryItems)
@@ -106,7 +108,7 @@ class InventoryItemAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
+    list_display = ('id', 'code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
     list_per_page = 15
     change_list_template = 'admin/inventory/inventory_item_report_page.html'
 
@@ -319,6 +321,9 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
             'fields': (('code', 'color_name'), ('product',)),
         }),
         ('', {
+           'fields': ('output_standard',),
+        }),
+        ('', {
             'fields': ('description',),
         })
     )
@@ -327,6 +332,7 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
         'fk': ['customer', 'customer_category', 'product']
     }
     inlines = [BillOfMaterialDetailsInline]
+    readonly_fields = ['output_standard']
     list_display = ('code', 'product', 'customer', 'customer_category', 'color_name')
     list_filter = ('color_name', 'customer', 'customer_category')
     search_fields = ('code', 'product__name', 'customer__name', 'color_name')
