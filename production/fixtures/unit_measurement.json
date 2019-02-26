@@ -1,0 +1,1 @@
+[{"model": "production.unitmeasurement", "pk": 1, "fields": {"name": "Kg"}}, {"model": "production.unitmeasurement", "pk": 2, "fields": {"name": "Pcs"}}]

@@ -1,23 +1,60 @@
 import numpy as np
 import pandas as pd
-from decimal import  Decimal, getcontext
 
 from django.contrib import admin
 from django.urls import path
 from django.template.response import TemplateResponse
-from django.http.response import HttpResponse
-from django.db.models import F
+
+from django.db.models import F, Q
+from django.contrib import messages
+from django.utils import timezone
 
 from import_export.admin import ImportExportMixin, ExportMixin
 
 from production.models.customer import Customer, CustomerCategory, Supplier
-from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, StockMovement
-from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, Manufacture, ProductUsage
+from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, \
+    StockMovement, InventoryAdjustment
+from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, \
+    Manufacture, ProductUsage
 from production.resources import ManufactureExportResource, ProductUsageExportResource
-from production.forms import ProductUsageReportForm
+from production.forms import ProductUsageReportForm, ProductUsageInlineForm, StockMovementForm
 from html2pdf.response import HTML2PDFResponse
 
 # Register your models here.
+class BasePrintAdmin(object):
+    def get_print_queryset(self, request):
+        """
+        Return print queryset.
+
+        Default implementation respects applied search and filters.
+        """
+        list_display = self.get_list_display(request)
+        list_display_links = self.get_list_display_links(request, list_display)
+        list_filter = self.get_list_filter(request)
+        search_fields = self.get_search_fields(request)
+        if self.get_actions(request):
+            list_display = ['action_checkbox'] + list(list_display)
+
+        Changelist = self.get_changelist(request)
+        changelist_kwargs = {
+            'request': request,
+            'model': self.model,
+            'list_display': list_display,
+            'list_display_links': list_display_links,
+            'list_filter': list_filter,
+            'date_hierarchy': self.date_hierarchy,
+            'search_fields': search_fields,
+            'list_select_related': self.list_select_related,
+            'list_per_page': self.list_per_page,
+            'list_max_show_all': self.list_max_show_all,
+            'list_editable': self.list_editable,
+            'model_admin': self,
+            'sortable_by': self.sortable_by
+        }
+        cl = Changelist(**changelist_kwargs)
+        return cl.get_queryset(request)
+
+
 @admin.register(Customer)
 class CustomerAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
@@ -26,7 +63,7 @@ class CustomerAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
-    list_display = ('name',)
+    list_display = ('id', 'name',)
     list_per_page = 25
 
 
@@ -38,6 +75,7 @@ class CustomerCategoryAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
+    list_display = ('id', 'name')
 
 
 @admin.register(Supplier)
@@ -48,19 +86,21 @@ class SupplierAdmin(ImportExportMixin, admin.ModelAdmin):
         }),
     )
     search_fields = ('name',)
+    list_display = ('id', 'name',)
     list_per_page = 25
 
 
 @admin.register(UnitMeasurement)
 class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ('name',)
+    list_display = ('id', 'name',)
 
 
 @admin.register(InventoryItems)
-class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
+class InventoryItemAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Inventory Information', {
-            'fields': (('code', 'type'), ('name', 'unit')),
+            'fields': (('code', 'type'), ('name', 'unit'), ('price', 'initial')),
         }),
     )
     raw_id_fields = ('unit',)
@@ -69,12 +109,48 @@ class InventoryItemAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
-    list_display = ('code', 'name', 'type', 'available', 'unit')
-    list_per_page = 25
+    list_display = ('id', 'code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
+    list_per_page = 15
+    change_list_template = 'admin/inventory/inventory_item_report_page.html'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        inventory_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_itenvetoryitem),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+
+        return inventory_urls + urls
+
+    def print_itenvetoryitem(self, request):
+        object = self.get_print_queryset(request)
+        template = 'admin/inventory/inventory_item_pdf_layout.html'
+        date = timezone.now()
+        context = {
+            'item_list': object,
+            'page_title': "Daftar Persediaan Inventory",
+            'date': date
+        }
+        return HTML2PDFResponse(
+            request, template, context,
+            filename="Inventory Stock Card - {}".format(date)
+        )
+
+
+@admin.register(InventoryAdjustment)
+class InventoryAdjustmentAdmin(admin.ModelAdmin):
+    fields = (('item', 'quantity'), )
+    list_display = ('item', 'quantity', 'last_edited', 'first_created')
+    raw_id_fields = ['item',]
+    autocomplete_lookup_fields = {
+        'fk': ['item',]
+    }
 
 
 @admin.register(StockLevel)
-class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
+class StockLevelAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Stock Movement Details', {
             'fields': (('item', 'supplier'),('delivery_note', 'datetime'))
@@ -96,15 +172,57 @@ class StockLevelAdmin(ImportExportMixin, admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'return':
-            obj.quantity = obj.quantity * -1
+            obj.quantity *= -1
         super().save_model(request, obj, form, change)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        purchasing_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_purchasing),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+        return purchasing_urls + urls
+
+    def print_purchasing(self, request):
+        queryset = self.get_print_queryset(request)
+        page_title = "Daftar Pembelian Baranag"
+        date = timezone.now()
+        data = dict(date=[], product_code=[], product_name=[], status=[], quantity=[])
+        for i in queryset:
+            data['date'].append(i.datetime.date())
+            data['product_code'].append(i.item.code)
+            data['product_name'].append(i.item.name)
+            data['status'].append(i.status)
+            data['quantity'].append(i.quantity)
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'status'],
+            values='quantity',
+            fill_value=0
+        )
+        template = 'admin/stocklevel/stocklevel_print_pdf_layout.html'
+        context = {
+            'delivery_list': pivot.to_html(classes=['minimalistBlack']),
+            'page_title': page_title,
+            'date': date
+        }
+
+        return HTML2PDFResponse(
+            request, template, context=context,
+            filename="Purchasing - {}".format(date)
+        )
 
 
 @admin.register(StockMovement)
-class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
+class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     fieldsets = (
         ('Stock Movement Details', {
-            'fields': ('customer', ('delivery_order', 'datetime'), 'status')
+            'fields': (('customer', 'jo_number'), ('delivery_order', 'datetime'), 'status')
         }),
         ('Item Details', {
             'fields': ('item', ('quantity', 'unit'))
@@ -119,13 +237,63 @@ class StockMovementAdmin(ImportExportMixin, admin.ModelAdmin):
     }
     search_fields = ('item__name', 'customer__name', 'delivery_order')
     list_filter = ('status', 'datetime')
-    list_display = ('item', 'customer', 'quantity', 'unit', 'datetime', 'status')
+    list_display = ('item', 'customer', 'jo_number', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
+    form = StockMovementForm
+    change_list_template = 'admin/stockmovement/stockmovement_report_page.html'
+
+    def save_model(self, request, obj, form, change):
+        if obj.status == 'return':
+            obj.quantity *= -1
+        super().save_model(request, obj, form, change)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        delivery_urls = [
+            path('print/',
+                    self.admin_site.admin_view(self.print_delivery),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+        return delivery_urls + urls
+
+    def print_delivery(self, request):
+        queryset = self.get_print_queryset(request)
+        page_title = "Daftar Pengiriman Baranag"
+        date = timezone.now()
+        data = dict(date=[], product_code=[], product_name=[], status=[], quantity=[])
+        for i in queryset:
+            data['date'].append(i.datetime.date())
+            data['product_code'].append(i.item.code)
+            data['product_name'].append(i.item.name)
+            data['status'].append(i.status)
+            data['quantity'].append(i.quantity)
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'status'],
+            values='quantity',
+            fill_value=0
+        )
+        template = 'admin/stockmovement/stockmovement_pdf_layout.html'
+        context = {
+            'delivery_list': pivot.to_html(classes=['minimalistBlack']),
+            'page_title': page_title,
+            'date': date
+        }
+
+        return HTML2PDFResponse(
+            request, template, context=context,
+            filename="Delivery - {}".format(date)
+        )
 
 
 class BillOfMaterialDetailsInline(admin.TabularInline):
     model = BillOfMaterialDetails
     extra = 0
+    fields = ('material', 'quantity', 'unit')
     raw_id_fields = ('material', 'unit')
     autocomplete_lookup_fields = {
         'fk': ['unit', 'material']
@@ -151,7 +319,10 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
             'fields': (('customer', 'customer_category'),),
         }),
         ('Product Details', {
-            'fields': (('code', 'color_name'), ('product', 'price')),
+            'fields': (('code', 'color_name'), ('product',)),
+        }),
+        ('', {
+           'fields': ('output_standard',),
         }),
         ('', {
             'fields': ('description',),
@@ -162,6 +333,7 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
         'fk': ['customer', 'customer_category', 'product']
     }
     inlines = [BillOfMaterialDetailsInline]
+    readonly_fields = ['output_standard']
     list_display = ('code', 'product', 'customer', 'customer_category', 'color_name')
     list_filter = ('color_name', 'customer', 'customer_category')
     search_fields = ('code', 'product__name', 'customer__name', 'color_name')
@@ -176,18 +348,23 @@ class ProductUsageInline(admin.TabularInline):
     autocomplete_lookup_fields = {
         'fk': ['item', 'unit']
     }
+    form = ProductUsageInlineForm
 
 
 @admin.register(Manufacture)
 class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     fieldsets = (
         ('Production Details', {
-            'fields': (('datetime', 'customer'), ('price', 'bill_of_material'), ('quantity', 'unit')),
+            'fields': (('customer', 'datetime'), ('bill_of_material', 'price'), ('unit', 'quantity')),
         }),
+        ('', {
+            'fields': ('bom_output_standard',),
+        })
     )
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
                     'customer', 'quantity', 'unit', 'status')
     search_fields = ('bill_of_material__code', 'bill_of_material__product__name')
+    readonly_fields = ('price', 'bom_output_standard')
     list_editable = ('status',)
     list_filter = ('datetime',)
     inlines = [ProductUsageInline]
@@ -202,18 +379,66 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if obj.id == None:
             obj.save()
-            t_quantity = obj.quantity
-            bom_details = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
-            material_usage = []
+            t_qty = obj.quantity
+            bom = BillOfMaterialDetails.objects.filter(bill_of_material=obj.bill_of_material)
+            bom_output_weight = obj.bill_of_material.output_weight()
+            mtr_used = []
 
-            for i in bom_details:
-                p = ProductUsage(item=i.material, manufacture=obj,
-                                 quantity=(i.quantity * t_quantity), unit=i.unit)
-                material_usage.append(p)
+            msgs = []
+            for i in bom:
+                p = ProductUsage(
+                    item=i.material, manufacture=obj,
+                    quantity=((i.quantity / bom_output_weight) * t_qty), unit=i.unit
+                )
+                if p.quantity > p.item.availability():
+                    msgs.append("Stock \"{} - {}\" tidak mencukupi".format(p.item.code, p.item.name))
+                else:
+                    p.price = i.quantity * i.material.price
+                    mtr_used.append(p)
 
-            ProductUsage.objects.bulk_create(material_usage)
-        else:
-            obj.save()
+            if msgs:
+                for i in msgs:
+                    messages.add_message(request, messages.ERROR, i)
+                info_msg = "Hapus record produksi \"{} - {} untuk {} tanggal {}\" agar " \
+                           "tidak mempengaruhi nilai stock".format(obj.bill_of_material.product.code,
+                                                                   obj.bill_of_material.product.name,
+                                                                   obj.customer.name,
+                                                                   obj.datetime)
+                messages.add_message(request, messages.INFO, info_msg)
+
+            ProductUsage.objects.bulk_create(mtr_used)
+
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        obj.save()
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.get_model_info()
+        manufacture_urls = [
+            path('<int:object_id>/print/',
+                    self.admin_site.admin_view(self.print_bill_of_material),
+                    name='{}_{}_print'.format(info[0], info[1]))
+        ]
+
+        return manufacture_urls + urls
+
+    def print_bill_of_material(self, request, object_id):
+        manufacture = Manufacture.objects.get(pk=object_id)
+        filters = (Q(item__type='TTD') | Q(item__type='BT'))
+        product_usage = ProductUsage.objects.filter(manufacture=manufacture).exclude(item__type='CON')
+        consumable = ProductUsage.objects.filter(manufacture=manufacture).exclude(filters)
+        context = {
+            'manufacture': manufacture,
+            'product_usage': product_usage,
+            'consumable': consumable,
+        }
+
+        return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',
+                                context=context, filename='BoM-{}'.format(manufacture.datetime))
 
     def get_urls(self):
         urls = super().get_urls()
@@ -345,6 +570,29 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
         )
         return pivot.to_html(classes=['minimalistBlack'])
 
+    def _pivoting_product_output_summary(self, queryset):
+        data = dict(date=[], product_code=[], product_name=[], unit=[], quantity=[], price=[])
+
+        for i in queryset:
+            data['date'].append(i['date_time'].date())
+            data['product_code'].append(i['product_code'])
+            data['product_name'].append(i['product_name'])
+            data['unit'].append(i['unit_name'])
+            data['quantity'].append(i['qty'])
+            data['price'].append(i['total'])
+
+        data_frame = pd.DataFrame(data=data)
+        data_frame['quantity'] = data_frame['quantity'].astype(float)
+        data_frame['price'] = data_frame['price'].astype(float)
+        pivot = pd.pivot_table(
+            data_frame.round(3),
+            index=['date', 'product_code', 'product_name', 'unit'],
+            values='quantity',
+            aggfunc=np.sum,
+            fill_value=0
+        )
+        return pivot.to_html(classes=['minimalistBlack'])
+
     def print(self, request):
         form = ProductUsageReportForm(request.POST or None)
 
@@ -383,11 +631,27 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
                 context['summary'] = data_sum
 
             if report_type == 'product':
-                data_sum = self._pivoting_product_output(material)
+                manufacture = Manufacture.objects.filter(
+                    datetime__date__range=[start_date, end_date]
+                ).values(
+                    date_time=F('datetime'),
+                    bom=F('bill_of_material'),
+                    product_code=F('bill_of_material__product__code'),
+                    product_name=F('bill_of_material__product__name'),
+                    unit_name=F('unit__name'),
+                    qty=F('quantity'),
+                    total=F('price'),
+                ).order_by(
+                    'datetime__date', 'bill_of_material__product__name'
+                )
+
+                data_mat = self._pivoting_product_output(material)
+                data_sum = self._pivoting_product_output_summary(manufacture)
                 context['page_title'] = "Summary Penggunaan Material per Output Produksi - Periode {} - {}".format(
                     start_date, end_date
                 )
-                context['report'] = data_sum
+                context['report'] = data_mat
+                context['summary'] = data_sum
 
             return HTML2PDFResponse(
                 request, template, context,

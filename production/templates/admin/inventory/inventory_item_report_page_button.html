@@ -1,0 +1,6 @@
+{% load i18n %}
+{% load admin_urls %}
+
+{% if has_export_permission %}
+    <li><a href="{% url opts|admin_urlname:'print' %}{{cl.get_query_string}}" class="grp-state-focus">{% trans "Print" %}</a></li>
+{% endif %}

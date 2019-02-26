@@ -1,4 +1,4 @@
-{% load static %}
+{% load humanize static %}
 
 <!doctype html>
 <html lang="en">
@@ -10,12 +10,12 @@
     <link rel="stylesheet" type="text/css" href="{% static 'production/page_A4.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'production/table_report_style.css' %}">
 
-    <title>Document</title>
+    <title>Inventory Stock Card</title>
 </head>
 <body>
     <h3>{{ page_title }}</h3>
-    {{ report|safe }}
-    <div class="pagebreak"></div>
-    {{ summary|safe }}
+    <p><b>Tanggal cetak</b> : {{ date }}</p>
+    <br />
+    {{ delivery_list|safe }}
 </body>
 </html>

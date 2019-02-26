@@ -43,6 +43,15 @@
             <td>:</td>
             <td>{{ manufacture.quantity|floatformat:3|intcomma }} {{ manufacture.unit.name }}</td>
         </tr>
+        <tr>
+            <td class="bom-note">Keterangan tambahan</td>
+            <td>:</td>
+            <td>
+                {% for product in consumable %}
+                    {{ product.item.name }} = {{ product.quantity|floatformat:0 }}{{ product.unit.name }}<br />
+                {% endfor %}
+            </td>
+        </tr>
     </table>
     <br />
     {% if product_usage %}

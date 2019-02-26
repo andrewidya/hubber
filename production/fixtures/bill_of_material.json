@@ -1,0 +1,1 @@
+[{"model": "production.billofmaterial", "pk": 9, "fields": {"code": "BT-001", "customer": 1, "customer_category": 1, "color_name": "Red Sampoerna", "product": 85, "price": "0.0000", "description": ""}}]
