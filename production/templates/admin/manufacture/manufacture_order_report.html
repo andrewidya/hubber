@@ -19,16 +19,6 @@
             <td>{{ manufacture.datetime|date:'Y-m-d' }}</td>
         </tr>
         <tr>
-            <td>Jam</td>
-            <td>:</td>
-            <td>{{ manufacture.datetime|date:'H:i' }}</td>
-        </tr>
-        <tr>
-            <td>Customer</td>
-            <td>:</td>
-            <td>{{ manufacture.customer.name }}</td>
-        </tr>
-        <tr>
             <td>Kode Formula</td>
             <td>:</td>
             <td>{{ manufacture.bill_of_material.code }}</td>
@@ -45,7 +35,7 @@
         </tr>
         <tr>
             <td class="bom-note">Keterangan tambahan</td>
-            <td>:</td>
+            <td class="bom-note">:</td>
             <td>
                 {% for product in consumable %}
                     {{ product.item.name }} = {{ product.quantity|floatformat:0 }}{{ product.unit.name }}<br />

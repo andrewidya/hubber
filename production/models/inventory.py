@@ -120,8 +120,7 @@ class StockMovement(models.Model):
         ('sent', "Delivery"),
         ('return', "Return")
     )
-    delivery_order = models.CharField(verbose_name=_("Delivery order"), max_length=45, null=True,
-                                      blank=True)
+    delivery_order = models.CharField(verbose_name=_("Delivery order"), max_length=45, null=True, blank=True)
     datetime = models.DateTimeField(verbose_name=_("Datetime"))
     quantity = models.DecimalField(verbose_name=_("Quantity"), decimal_places=4, max_digits=14)
     item = models.ForeignKey(InventoryItems, verbose_name=_("Item"), on_delete=models.CASCADE)

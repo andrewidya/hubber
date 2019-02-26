@@ -16,7 +16,7 @@ from production.models.inventory import UnitMeasurement, InventoryItems, StockLe
     StockMovement, InventoryAdjustment
 from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, \
     Manufacture, ProductUsage
-from production.resources import ManufactureExportResource, ProductUsageExportResource
+from production.resources import ManufactureExportResource, ProductUsageExportResource, StockMovementExportResource
 from production.forms import ProductUsageReportForm, ProductUsageInlineForm, StockMovementForm
 from html2pdf.response import HTML2PDFResponse
 
@@ -64,6 +64,7 @@ class CustomerAdmin(ImportExportMixin, admin.ModelAdmin):
     )
     search_fields = ('name',)
     list_display = ('id', 'name',)
+    list_display_links = ('id', 'name')
     list_per_page = 25
 
 
@@ -76,6 +77,7 @@ class CustomerCategoryAdmin(ImportExportMixin, admin.ModelAdmin):
     )
     search_fields = ('name',)
     list_display = ('id', 'name')
+    list_display_links = ('id', 'name')
 
 
 @admin.register(Supplier)
@@ -87,6 +89,7 @@ class SupplierAdmin(ImportExportMixin, admin.ModelAdmin):
     )
     search_fields = ('name',)
     list_display = ('id', 'name',)
+    list_display_links = ('id', 'name',)
     list_per_page = 25
 
 
@@ -94,6 +97,7 @@ class SupplierAdmin(ImportExportMixin, admin.ModelAdmin):
 class UnitMeasurementAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ('name',)
     list_display = ('id', 'name',)
+    list_display_links = ('id', 'name',)
 
 
 @admin.register(InventoryItems)
@@ -109,6 +113,7 @@ class InventoryItemAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     }
     search_fields = ('code', 'name')
     list_filter = ('type', 'unit')
+    list_display_links = ('id', 'code',)
     list_display = ('id', 'code', 'name', 'type', 'initial', 'availability' ,'unit', 'price')
     list_per_page = 15
     change_list_template = 'admin/inventory/inventory_item_report_page.html'
@@ -240,6 +245,7 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     list_display = ('item', 'customer', 'jo_number', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
     form = StockMovementForm
+    resource_class = StockMovementExportResource
     change_list_template = 'admin/stockmovement/stockmovement_report_page.html'
 
     def save_model(self, request, obj, form, change):
@@ -340,6 +346,17 @@ class BillOfMaterialAdmin(ImportExportMixin, admin.ModelAdmin):
     list_per_page = 25
     actions = [copy_bill_of_material]
 
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        obj.output_standard = obj.output_weight()
+        obj.save()
+
+
+@admin.register(BillOfMaterialDetails)
+class BillOfMaterialDetailsAdmin(ImportExportMixin, admin.ModelAdmin):
+    list_display = ('bill_of_material', 'material', 'quantity', 'unit')
+
 
 class ProductUsageInline(admin.TabularInline):
     model = ProductUsage
@@ -357,9 +374,6 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
         ('Production Details', {
             'fields': (('customer', 'datetime'), ('bill_of_material', 'price'), ('unit', 'quantity')),
         }),
-        ('', {
-            'fields': ('bom_output_standard',),
-        })
     )
     list_display = ('datetime', 'bill_of_material', '_product_name', 'price',
                     'customer', 'quantity', 'unit', 'status')
@@ -435,28 +449,6 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
             'manufacture': manufacture,
             'product_usage': product_usage,
             'consumable': consumable,
-        }
-
-        return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',
-                                context=context, filename='BoM-{}'.format(manufacture.datetime))
-
-    def get_urls(self):
-        urls = super().get_urls()
-        info = self.get_model_info()
-        manufacture_urls = [
-            path('<int:object_id>/print/',
-                    self.admin_site.admin_view(self.print_bill_of_material),
-                    name='{}_{}_print'.format(info[0], info[1]))
-        ]
-
-        return manufacture_urls + urls
-
-    def print_bill_of_material(self, request, object_id):
-        manufacture = Manufacture.objects.get(pk=object_id)
-        product_usage = ProductUsage.objects.filter(manufacture=manufacture)
-        context = {
-            'manufacture': manufacture,
-            'product_usage': product_usage,
         }
 
         return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',

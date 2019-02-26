@@ -2,6 +2,7 @@ from import_export.resources import ModelResource
 from import_export.fields import Field
 
 from production.models.manufacture import Manufacture, ProductUsage
+from production.models.inventory import StockMovement
 
 
 class ManufactureExportResource(ModelResource):
@@ -31,4 +32,20 @@ class ProductUsageExportResource(ModelResource):
 
     class Meta:
         model = ProductUsage
+        fields = ('',)
+
+
+class StockMovementExportResource(ModelResource):
+    date = Field(attribute='datetime__date', column_name='Date')
+    delivery_order = Field(attribute='delivery_order', column_name='Delivery Order')
+    jo_number = Field(attribute='jo_number', column_name='JO Number')
+    customer_name = Field(attribute='customer__name', column_name='Customer')
+    item_name = Field(attribute='item__name', column_name='Item')
+    status = Field(attribute='status', column_name='Status')
+    quantity = Field(attribute='quantity', column_name='Quantity')
+    unit = Field(attribute='unit__name', column_name='Unit')
+    description = Field(attribute='description', column_name='Description')
+
+    class Meta:
+        model = StockMovement
         fields = ('',)

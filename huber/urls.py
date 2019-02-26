@@ -20,14 +20,11 @@ from django.http import HttpResponseRedirect
 
 from . import grappelli_urls
 
-
-from . import grappelli_urls
-
 urlpatterns = [
     path('', lambda x: HttpResponseRedirect('admin')),
     path('grappelli/', include('grappelli.urls')), # grappelli URLS
     path('admin/', admin.site.urls),
-    path('doc/', include(grappelli_urls))
+    # path('doc/', include(grappelli_urls))
 ]
 
 if settings.DEBUG:

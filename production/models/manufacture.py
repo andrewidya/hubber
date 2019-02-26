@@ -31,11 +31,6 @@ class BillOfMaterial(models.Model):
     def __str__(self):
         return "{} - {}".format(self.code, self.product.name)
 
-    def save(self, *args, **kwargs):
-        super().save(args, kwargs)
-        self.output_standard = self.output_weight()
-        super().save(args, kwargs)
-
     @staticmethod
     def autocomplete_search_fields():
         return ('id__iexact', 'code__icontains')
@@ -55,8 +50,8 @@ class BillOfMaterialDetails(models.Model):
                                 null=True, blank=True, default=0)
 
     class Meta:
-        verbose_name = _("1.9. Rincian Formula")
-        verbose_name_plural = _("1.9. Daftar Rincian Formula")
+        verbose_name = _("1.8.1 Rincian Formula")
+        verbose_name_plural = _("1.8.1 Daftar Rincian Formula")
         app_label = 'production'
 
     def __str__(self):
