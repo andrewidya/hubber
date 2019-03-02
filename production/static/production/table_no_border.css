@@ -1,0 +1,16 @@
+table.no-border {
+    max-width: 50%;
+    text-align: left;
+}
+
+table.no-border td, table.no-border th {
+    padding: 1px 0px;
+}
+
+table.no-border tbody td {
+    font-size: 12px;
+}
+
+table.no-border tr td.bom-note {
+    vertical-align: top;
+}
