@@ -3,6 +3,5 @@
 db.sqlite3
 *.sqlite3
 static
-*/static
 *.pyc*
 index.html
