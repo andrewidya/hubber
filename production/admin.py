@@ -267,11 +267,12 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
         queryset = self.get_print_queryset(request)
         page_title = "Daftar Pengiriman Baranag"
         date = timezone.now()
-        data = dict(date=[], product_code=[], product_name=[], status=[], quantity=[])
+        data = dict(date=[], product_code=[], product_name=[], jo_number=[], status=[], quantity=[])
         for i in queryset:
             data['date'].append(i.datetime.date())
             data['product_code'].append(i.item.code)
             data['product_name'].append(i.item.name)
+            data['jo_number'].append(i.jo_number)
             data['status'].append(i.status)
             data['quantity'].append(i.quantity)
 
@@ -279,7 +280,7 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
         data_frame['quantity'] = data_frame['quantity'].astype(float)
         pivot = pd.pivot_table(
             data_frame.round(3),
-            index=['date', 'product_code', 'product_name', 'status'],
+            index=['date', 'product_code', 'product_name', 'jo_number', 'status'],
             values='quantity',
             fill_value=0
         )
