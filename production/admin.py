@@ -140,7 +140,7 @@ class InventoryItemAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
         }
         return HTML2PDFResponse(
             request, template, context,
-            filename="Inventory Stock Card - {}".format(date)
+            filename="Inventory Stock Card - {}.pdf".format(date)
         )
 
 
@@ -219,7 +219,7 @@ class StockLevelAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
 
         return HTML2PDFResponse(
             request, template, context=context,
-            filename="Purchasing - {}".format(date)
+            filename="Purchasing - {}.pdf".format(date)
         )
 
 
@@ -292,7 +292,7 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
 
         return HTML2PDFResponse(
             request, template, context=context,
-            filename="Delivery - {}".format(date)
+            filename="Delivery - {}.pdf".format(date)
         )
 
 
@@ -452,7 +452,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
         }
 
         return HTML2PDFResponse(request, 'admin/manufacture/manufacture_order_report.html',
-                                context=context, filename='BoM-{}'.format(manufacture.datetime))
+                                context=context, filename='BoM-{}.pdf'.format(manufacture.datetime))
 
 
 @admin.register(ProductUsage)
@@ -647,7 +647,7 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
 
             return HTML2PDFResponse(
                 request, template, context,
-                filename="{}-{}-{}".format(start_date, end_date, report_type)
+                filename="{}-{}-{}.pdf".format(start_date, end_date, report_type)
             )
 
         opts = self.model._meta
