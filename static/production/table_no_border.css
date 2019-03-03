@@ -4,7 +4,7 @@ table.no-border {
 }
 
 table.no-border td, table.no-border th {
-    padding: 5px 3px;
+    padding: 1px 0px;
 }
 
 table.no-border tbody td {

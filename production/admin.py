@@ -407,7 +407,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
                 if p.quantity > p.item.availability():
                     msgs.append("Stock \"{} - {}\" tidak mencukupi".format(p.item.code, p.item.name))
                 else:
-                    p.price = i.quantity * i.material.price
+                    p.price = p.quantity * i.material.price
                     mtr_used.append(p)
 
             if msgs:
