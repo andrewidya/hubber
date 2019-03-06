@@ -56,10 +56,21 @@ class StockMovementForm(forms.ModelForm):
         qty = self.cleaned_data.get('quantity')
         item = self.cleaned_data.get('item')
 
+        status = self.instance.status or self.cleaned_data.get('status')
+        initial = self.initial
+
+        if status == 'return':
+            if qty > 0:
+                qty *= -1
+
+        if status == 'sent':
+            if qty < 0:
+                qty *= -1
+
         if qty > item.availability():
             raise forms.ValidationError(
                 _("Jumlah stock yang tersedia tidak mencukupi")
             )
-        else:
-            return qty
+
+        return qty
 

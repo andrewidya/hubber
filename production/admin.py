@@ -248,10 +248,11 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
     resource_class = StockMovementExportResource
     change_list_template = 'admin/stockmovement/stockmovement_report_page.html'
 
-    def save_model(self, request, obj, form, change):
-        if obj.status == 'return':
-            obj.quantity *= -1
-        super().save_model(request, obj, form, change)
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ['status',]
+        else:
+            return self.readonly_fields
 
     def get_urls(self):
         urls = super().get_urls()

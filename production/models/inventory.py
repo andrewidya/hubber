@@ -76,12 +76,6 @@ class InventoryItems(models.Model):
         return round(val, 4)
 
     def availability(self):
-        initial = self.initial
-        purchased = self.purchased()
-        produced = self.produced()
-        used = self.used()
-        delivered = self.delivered()
-        ajdustment = self.adjustment()
 
         avl = self.initial + self.purchased() + self.produced() - self.used() - self.delivered() + self.adjustment()
         return round(avl, 4)
