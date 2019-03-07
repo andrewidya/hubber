@@ -10,13 +10,15 @@ from django.contrib import messages
 from django.utils import timezone
 
 from import_export.admin import ImportExportMixin, ExportMixin
+from rangefilter.filter import DateRangeFilter
 
 from production.models.customer import Customer, CustomerCategory, Supplier
 from production.models.inventory import UnitMeasurement, InventoryItems, StockLevel, \
     StockMovement, InventoryAdjustment
 from production.models.manufacture import BillOfMaterial, BillOfMaterialDetails, \
     Manufacture, ProductUsage
-from production.resources import ManufactureExportResource, ProductUsageExportResource, StockMovementExportResource
+from production.resources import ManufactureExportResource, ProductUsageExportResource, \
+    StockMovementExportResource
 from production.forms import ProductUsageReportForm, ProductUsageInlineForm, StockMovementForm
 from html2pdf.response import HTML2PDFResponse
 
@@ -169,7 +171,7 @@ class StockLevelAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
         'fk': ['item', 'supplier', 'unit'],
     }
     search_fields = ('item__name', 'supplier__name', 'delivery_note')
-    list_filter = ('item__type', 'status', 'datetime')
+    list_filter = ('item__type', 'status', 'datetime', ('datetime', DateRangeFilter))
     list_display = ('item', 'item_type', 'delivery_note', 'datetime',
                     'supplier', 'quantity', 'unit', 'status')
     list_per_page = 25
@@ -241,7 +243,7 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
         'fk': ['customer', 'item', 'unit'],
     }
     search_fields = ('item__name', 'customer__name', 'delivery_order')
-    list_filter = ('status', 'datetime')
+    list_filter = ('status', 'datetime', ('datetime', DateRangeFilter))
     list_display = ('item', 'customer', 'jo_number', 'quantity', 'unit', 'datetime', 'status')
     list_per_page = 25
     form = StockMovementForm
@@ -382,7 +384,7 @@ class ManufactureAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ('bill_of_material__code', 'bill_of_material__product__name')
     readonly_fields = ('price', 'bom_output_standard')
     list_editable = ('status',)
-    list_filter = ('datetime',)
+    list_filter = ('datetime',('datetime', DateRangeFilter))
     inlines = [ProductUsageInline]
     raw_id_fields = ['bill_of_material', 'customer', 'unit']
     list_per_page = 25
@@ -464,7 +466,8 @@ class ProductUsageAdmin(ExportMixin, admin.ModelAdmin):
     list_display = ('get_datetime', 'item', 'manufacture', 'quantity', 'unit')
     list_display_links = ('item',)
     search_fields = ('item__code', 'item__name')
-    list_filter = ('manufacture__datetime', 'manufacture__bill_of_material')
+    list_filter = ('manufacture__datetime', 'manufacture__bill_of_material',
+                   ('manufacture__datetime', DateRangeFilter))
     change_list_template = 'admin/productusage/productusage_report_page.html'
     resource_class = ProductUsageExportResource
 
