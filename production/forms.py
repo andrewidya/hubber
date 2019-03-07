@@ -57,7 +57,6 @@ class StockMovementForm(forms.ModelForm):
         item = self.cleaned_data.get('item')
 
         status = self.instance.status or self.cleaned_data.get('status')
-        initial = self.initial
 
         if status == 'return':
             if qty > 0:
