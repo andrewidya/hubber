@@ -48,7 +48,7 @@ class InventoryItems(models.Model):
 
     @staticmethod
     def autocomplete_search_fields():
-        return ('id__iexact', 'code__icontains',)
+        return ('id__iexact', 'code__icontains', 'name__icontains')
 
     def purchased(self):
         agg_purchased = self.stocklevel_set.all().aggregate(total=models.Sum('quantity'))
