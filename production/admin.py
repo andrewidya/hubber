@@ -268,7 +268,7 @@ class StockMovementAdmin(ImportExportMixin, BasePrintAdmin, admin.ModelAdmin):
 
     def print_delivery(self, request):
         queryset = self.get_print_queryset(request)
-        page_title = "Daftar Pengiriman Baranag"
+        page_title = "Daftar Pengiriman Barang"
         date = timezone.now()
         data = dict(date=[], product_code=[], product_name=[], jo_number=[], status=[], quantity=[])
         for i in queryset:
