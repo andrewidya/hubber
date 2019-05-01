@@ -33,7 +33,7 @@ class BillOfMaterial(models.Model):
 
     @staticmethod
     def autocomplete_search_fields():
-        return ('id__iexact', 'code__icontains')
+        return ('id__iexact', 'code__icontains', 'product__name__icontains', 'color_name__icontains')
 
     def output_weight(self):
         agg_val = self.billofmaterialdetails_set.all().aggregate(total=models.Sum('quantity'))
